@@ -1,4 +1,4 @@
-# Artificial Intelligence
+# 人工知能 (AI)
 
 Artificial Intelligence (AI) は、コンピュータに人間のような知能を持たせる技術の総称です。
 

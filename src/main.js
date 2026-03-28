@@ -2,7 +2,7 @@ import { marked } from 'marked';
 
 /**
  * Neural Archive Logic
- * Using Vite's glob import to automatically discover all articles.
+ * Automatically discovers all markdown articles and builds the Wiki structure.
  */
 const articleModules = import.meta.glob('../content/articles/**/*.md', { query: '?raw', import: 'default' });
 
@@ -13,36 +13,40 @@ const articleContentEl = document.getElementById('article-content');
 const articles = {};
 
 /**
- * Initialize the Wiki: Detect files and build sidebar
+ * Initialize the Wiki: Load content, detect H1 titles, and build sidebar
  */
 async function init() {
   console.log('Archive Connection Established...');
   
-  // Transform glob keys to searchable article names
-  for (const path in articleModules) {
-    // path example: '../content/articles/technology/neural-networks.md'
+  // Create an array of promises to load all articles in parallel
+  const loadPromises = Object.keys(articleModules).map(async (path) => {
     const parts = path.split('/');
     const fileName = parts.pop().replace('.md', '');
     
     // Calculate category from path
-    // path is relative to src/main.js: '../content/articles/cat/file.md'
-    // parts: ['..', 'content', 'articles', 'cat', 'file.md']
-    // category is at index 3 if it exists
     let category = 'General';
     if (parts.length > 3 && parts[3] !== fileName + '.md') {
       category = parts.slice(3).join('/') || 'General';
     }
+
+    // Load content to extract the H1 title
+    const loader = articleModules[path];
+    const rawContent = await loader();
     
-    // Derive title from filename (kebab-case to Space Case)
-    const title = fileName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-    
+    // Extract title from first H1 (# Title)
+    const h1Match = rawContent.match(/^#\s+(.+)$/m);
+    const title = h1Match ? h1Match[1].trim() : fileName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+
     articles[fileName] = {
       path,
       title,
       category,
-      loader: articleModules[path]
+      loader,
+      content: rawContent // Store content temporarily for auto-linking setup if needed
     };
-  }
+  });
+
+  await Promise.all(loadPromises);
 
   setupAutoLinks();
   renderSidebar();
@@ -53,12 +57,12 @@ async function init() {
 }
 
 /**
- * Configure Marked for Wikipedia-style automatic linking
+ * Configure Marked for Wikipedia-style automatic linking based on article titles
  */
 function setupAutoLinks() {
   const allTitles = Object.values(articles)
     .map(a => a.title)
-    .sort((a, b) => b.length - a.length); // Match longest titles first
+    .sort((a, b) => b.length - a.length); // Match longest titles first to prevent partial matches
 
   if (allTitles.length === 0) return;
 
@@ -78,8 +82,9 @@ function setupAutoLinks() {
         // Regex to find titles: 
         // 1. Not inside an existing markdown link [text](link)
         // 2. Not starting with # (header)
-        // 3. Exact word boundary
-        const regex = new RegExp(`(?<!\\[)\\b(${escapedTitles.join('|')})\\b(?!\\]\\()`, 'g');
+        // 3. Exact word boundary (using \b, works well for English and common separators)
+        // NOTE: For CJK titles, \b might behave differently, so we check for characters that are not [ or (
+        const regex = new RegExp(`(?<!\\[|\\#\\s)(${escapedTitles.join('|')})(?!\\]\\()`, 'g');
 
         return processed.replace(regex, (match) => {
           const name = titleToName[match];
@@ -100,13 +105,13 @@ function setupAutoLinks() {
 }
 
 /**
- * Render Sidebar Navigation with Categories
+ * Render Sidebar Navigation with Categories and Japanese Titles
  */
 function renderSidebar() {
   if (!articleListEl) return;
   
   articleListEl.innerHTML = `
-    <li><a href="#/" class="article-link">Home / Introduction</a></li>
+    <li><a href="#/" class="article-link">🏠 Home / Introduction</a></li>
   `;
   
   // Group articles by category
@@ -130,7 +135,8 @@ function renderSidebar() {
     catHeader.innerHTML = `<span>${cat.toUpperCase()}</span>`;
     articleListEl.appendChild(catHeader);
 
-    categories[cat].sort().forEach(name => {
+    // Sort articles within category by Japanese title alphabetically
+    categories[cat].sort((a, b) => articles[a].title.localeCompare(articles[b].title, 'ja')).forEach(name => {
       const li = document.createElement('li');
       li.className = 'article-item';
       li.innerHTML = `<a href="#/${name}" class="article-link">${articles[name].title}</a>`;
@@ -155,7 +161,7 @@ async function handleRouting() {
 }
 
 /**
- * Fetch and Render Article
+ * Fetch and Render Article content
  */
 async function loadArticle(name) {
   if (!articleContentEl) return;
@@ -170,7 +176,8 @@ async function loadArticle(name) {
       throw new Error(`Archived Data for "${name}" not found.`);
     }
 
-    const markdown = await article.loader();
+    // For better performance, use cached content if available during initialization
+    const markdown = article.content || await article.loader();
     const html = marked.parse(markdown);
     
     articleContentEl.innerHTML = html;
