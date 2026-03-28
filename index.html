@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Neural Archive | AI Wiki</title>
+  <meta name="description" content="AI用語をまとめた、シンプルで未来的なデザインのWiki「Project Neural Archive」。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Outfit:wght@400;600;700&family=Archivo+Black&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+<body class="neural-theme">
+  <div id="app">
+    <header class="header">
+      <div class="header-content">
+        <h1 id="site-title">P.N.A</h1>
+        <nav class="nav">
+          <ul id="main-nav">
+            <!-- Nav links will be injected dynamically or defined statically -->
+            <li><a href="#/" class="nav-link active">Home</a></li>
+            <li><a href="#/articles/" class="nav-link">Articles</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <div class="layout-container">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-inner">
+          <ul id="article-list" class="article-list">
+            <!-- Article names will be injected here -->
+          </ul>
+        </div>
+      </aside>
+
+      <main class="content-area" id="content-area">
+        <article id="article-content" class="markdown-body">
+          <!-- Content injected here -->
+          <div class="loading-spinner">Loading Archive...</div>
+        </article>
+      </main>
+    </div>
+
+    <footer class="footer">
+      <p>&copy; 2026 Project Neural Archive. Built for AI Knowledge Transmission.</p>
+    </footer>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
