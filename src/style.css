@@ -108,6 +108,12 @@ body {
   gap: 24px;
 }
 
+@media (max-width: 1180px) {
+  .nav {
+    display: none;
+  }
+}
+
 .nav-link {
   color: #666;
   text-decoration: none;
@@ -319,8 +325,8 @@ body {
   line-height: 1.3;
 }
 
-/* Mobile */
-@media (max-width: 900px) {
+/* Mobile / Tablet / iPad Pro 11" & 12.9" */
+@media (max-width: 1180px) {
   .menu-toggle {
     display: flex;
   }

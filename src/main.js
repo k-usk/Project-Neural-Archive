@@ -20,14 +20,13 @@ async function init() {
   
   // Create an array of promises to load all articles in parallel
   const loadPromises = Object.keys(articleModules).map(async (path) => {
-    const parts = path.split('/');
-    const fileName = parts.pop().replace('.md', '');
+    // Calculate full slug from path (e.g. tech/transformer or introduction)
+    const slug = path.replace('../content/articles/', '').replace('.md', '');
+    const parts = slug.split('/');
+    const fileName = parts[parts.length - 1];
     
     // Calculate category from path
-    let category = 'General';
-    if (parts.length > 3 && parts[3] !== fileName + '.md') {
-      category = parts.slice(3).join('/') || 'General';
-    }
+    let category = parts.length > 1 ? parts.slice(0, -1).join('/') : 'General';
 
     // Load content to extract the H1 title
     const loader = articleModules[path];
@@ -37,12 +36,12 @@ async function init() {
     const h1Match = rawContent.match(/^#\s+(.+)$/m);
     const title = h1Match ? h1Match[1].trim() : fileName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
-    articles[fileName] = {
+    articles[slug] = {
       path,
       title,
       category,
       loader,
-      content: rawContent // Store content temporarily for auto-linking setup if needed
+      content: rawContent
     };
   });
 
@@ -90,14 +89,24 @@ function setupAutoLinks() {
   marked.use({
     hooks: {
       preprocess(markdown) {
-        // Fix Marked's CJK bold bug: inject non-breaking zero-width spaces (ZWSP) around `**`
+        // Fix Marked's CJK bold bug: ensure whitespace boundary around `**`
         let processed = markdown;
         
-        // This regex ensures we only inject a space if there is a character right next to `**`
-        // We use a regular space to trick the markdown parser into seeing a boundary
-        processed = processed.replace(/([^\s\*])\*\*(.*?)\*\*([^\s\*])/g, '$1 **$2** $3');
-        processed = processed.replace(/^\*\*(.*?)\*\*([^\s\*])/gm, '**$1** $2');
-        processed = processed.replace(/([^\s\*])\*\*(.*?)\*\*$/gm, '$1 **$2**');
+        // 1. Remove suspicious internal spaces that often break CJK bolding in Marked
+        processed = processed.replace(/\*\* +/g, '**').replace(/ +\*\*/g, '**');
+
+        // 2. Ensure space OUTSIDE **...** using a more robust replacement function
+        // This handles cases like ：**bold** or word**bold** accurately
+        processed = processed.replace(/([^\s\*]?)(\*\*.*?\*\*)([^\s\*]?)/g, (match, p1, p2, p3) => {
+          let res = p2;
+          if (p1) {
+            res = (/\s/.test(p1) ? p1 : p1 + ' ') + res;
+          }
+          if (p3) {
+            res = res + (/\s/.test(p3) ? p3 : ' ' + p3);
+          }
+          return res;
+        });
 
         // 1. Temporarily replace blocks that shouldn't be auto-linked with placeholders
         // Includes: Markdown links, headers, code blocks, inline code, and math blocks ($...$ or $$...$$)
@@ -111,7 +120,7 @@ function setupAutoLinks() {
         const escapedTitles = allTitles.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
         
         // Create regex to match titles as whole phrases
-        const regex = new RegExp(`(${escapedTitles.join('|')})`, 'g');
+        const regex = new RegExp(`(?<![\\w\\u3040-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff])(${escapedTitles.join('|')})(?![\\w\\u3040-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff])`, 'g');
 
         processed = processed.replace(regex, (match) => {
           const name = titleToName[match];
