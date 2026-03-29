@@ -1,6 +1,7 @@
+<!-- alias: PPO, Proximal Policy Optimization -->
 # PPO (Proximal Policy Optimization)
 
-PPO（Proximal Policy Optimization：近接方策最適化）とは、2017年に**[OpenAI](#/tech/openai)**によって発表された、連続的または離散的な行動空間における強化学習（RL）の標準的かつ最先端のアルゴリズムである。
+PPO（Proximal Policy Optimization：近接方策最適化）とは、2017年に**OpenAI**によって発表された、連続的または離散的な行動空間における強化学習（RL）の標準的かつ最先端のアルゴリズムである。
 
 発表以来、その実装の比較的容易さと、訓練を極めて安定させる堅牢性から、深層強化学習（Deep RL）のデフォルトのデファクトスタンダードとして広く運用されている。
 
@@ -28,5 +29,5 @@ PPOはゲームAIからロボティクスまで幅広く使用されているが
 
 ## 関連項目
 - **RLHF**
-- **[OpenAI](#/tech/openai)**
+- **OpenAI**
 - **大型言語モデル (LLM)**

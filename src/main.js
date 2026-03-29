@@ -37,9 +37,14 @@ async function init() {
     const h1Match = rawContent.match(/^#\s+(.+)$/m);
     const title = h1Match ? h1Match[1].trim() : fileName.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
+    // Extract aliases from <!-- alias: ... -->
+    const aliasMatch = rawContent.match(/<!--\s*alias:\s*(.+?)\s*-->/i);
+    const aliases = aliasMatch ? aliasMatch[1].split(',').map(s => s.trim()).filter(Boolean) : [];
+
     articles[slug] = {
       path,
       title,
+      aliases,
       category,
       loader,
       content: rawContent
@@ -81,40 +86,47 @@ async function init() {
  * Configure Marked for Wikipedia-style automatic linking based on article titles
  */
 function setupAutoLinks() {
-  const allTitles = Object.values(articles)
-    .map(a => a.title)
-    .sort((a, b) => b.length - a.length); // Match longest titles first to prevent partial matches
+  const linkTargets = [];
+  const titleToName = {};
+
+  Object.keys(articles).forEach(name => {
+    const article = articles[name];
+    const rawTitle = article.title;
+    
+    // Process base title: split by parentheses if it exists
+    const match = rawTitle.match(/^([^\(（]+)\s*[(\uff08](.+)[)\uff09]$/);
+    const candidates = new Set();
+    
+    candidates.add(rawTitle); // Full title
+    
+    if (match) {
+      candidates.add(match[1].trim()); // Before parens
+      candidates.add(match[2].trim()); // Inside parens
+    }
+    
+    if (article.aliases && article.aliases.length > 0) {
+      article.aliases.forEach(alias => candidates.add(alias));
+    }
+    
+    // Add to linkTargets and map
+    candidates.forEach(t => {
+      if (!titleToName[t]) {
+        linkTargets.push(t);
+        titleToName[t] = name;
+      }
+    });
+  });
+
+  const allTitles = linkTargets.sort((a, b) => b.length - a.length); // Match longest titles first
 
   if (allTitles.length === 0) return;
-
-  const titleToName = {};
-  Object.keys(articles).forEach(name => {
-    titleToName[articles[name].title] = name;
-  });
 
   marked.use({
     hooks: {
       preprocess(markdown) {
-        // Fix Marked's CJK bold bug: ensure whitespace boundary around `**`
         let processed = markdown;
-        
-        // 1. Remove suspicious internal spaces that often break CJK bolding in Marked
-        processed = processed.replace(/\*\* +/g, '**').replace(/ +\*\*/g, '**');
 
-        // 2. Ensure space OUTSIDE **...** using a more robust replacement function
-        // This handles cases like ：**bold** or word**bold** accurately
-        processed = processed.replace(/([^\s\*]?)(\*\*.*?\*\*)([^\s\*]?)/g, (match, p1, p2, p3) => {
-          let res = p2;
-          if (p1) {
-            res = (/\s/.test(p1) ? p1 : p1 + ' ') + res;
-          }
-          if (p3) {
-            res = res + (/\s/.test(p3) ? p3 : ' ' + p3);
-          }
-          return res;
-        });
-
-        // 1. Temporarily replace blocks that shouldn't be auto-linked with placeholders
+        // Temporarily replace blocks that shouldn't be auto-linked with placeholders
         // Includes: Markdown links, headers, code blocks, inline code, and math blocks ($...$ or $$...$$)
         const protectedBlocks = [];
         processed = processed.replace(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|```[\s\S]*?```|`[^`]*`|\[[^\]]*\]\([^\)]*\)|\#\s+.+)/g, (match) => {
@@ -125,8 +137,9 @@ function setupAutoLinks() {
         // Escape regex special characters in titles
         const escapedTitles = allTitles.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
         
-        // Create regex to match titles as whole phrases
-        const regex = new RegExp(`(?<![\\w\\u3040-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff])(${escapedTitles.join('|')})(?![\\w\\u3040-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff])`, 'g');
+        // Create regex to match titles.
+        // Rule: Only require boundaries if the surrounding character is an English alphanumeric.
+        const regex = new RegExp(`(?<![A-Za-z0-9_])(${escapedTitles.join('|')})(?![A-Za-z0-9_])`, 'g');
 
         processed = processed.replace(regex, (match) => {
           const name = titleToName[match];
@@ -137,7 +150,7 @@ function setupAutoLinks() {
           return `[${match}](#/${name})`;
         });
 
-        // 2. Restore protected blocks
+        // Restore protected blocks
         return processed.replace(/__PROTECTED_BLOCK_(\d+)__/g, (match, index) => {
           return protectedBlocks[parseInt(index)];
         });
