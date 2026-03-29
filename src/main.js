@@ -54,6 +54,22 @@ async function init() {
 
   // Listen for hash changes
   window.addEventListener('hashchange', handleRouting);
+
+  // Setup Mobile Toggle
+  const menuToggle = document.getElementById('menu-toggle');
+  if (menuToggle) {
+    menuToggle.addEventListener('click', () => {
+      document.body.classList.toggle('sidebar-open');
+    });
+  }
+
+  // Clicking site title returns to home
+  const siteTitle = document.getElementById('site-title');
+  if (siteTitle) {
+    siteTitle.addEventListener('click', () => {
+      window.location.hash = '#/';
+    });
+  }
 }
 
 /**
@@ -151,6 +167,15 @@ function renderSidebar() {
 async function handleRouting() {
   const hash = window.location.hash.replace('#/', '') || 'introduction';
   
+  // Close mobile sidebar on navigation
+  document.body.classList.remove('sidebar-open');
+
+  // Handle special "articles" index route
+  if (hash === 'articles' || hash === 'articles/') {
+    renderArticleIndex();
+    return;
+  }
+
   // Highlighting active link in sidebar
   document.querySelectorAll('.article-link').forEach(link => {
     const href = link.getAttribute('href');
@@ -158,6 +183,50 @@ async function handleRouting() {
   });
 
   loadArticle(hash);
+}
+
+/**
+ * Render a visual index of all articles (used for #/articles/ route)
+ */
+function renderArticleIndex() {
+  if (!articleContentEl) return;
+
+  // Highlight "Articles" in nav
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.classList.toggle('active', link.getAttribute('href') === '#/articles/');
+  });
+
+  let indexHtml = `
+    <div class="article-index">
+      <h1>Archive Index</h1>
+      <p>Project Neural Archiveに収蔵されている全データの一覧です。カテゴリを選択してアクセスしてください。</p>
+      
+      <div class="index-grid">
+  `;
+
+  // Sort articles by title
+  const sortedNames = Object.keys(articles).sort((a, b) => 
+    articles[a].title.localeCompare(articles[b].title, 'ja')
+  );
+
+  sortedNames.forEach(name => {
+    const article = articles[name];
+    indexHtml += `
+      <a href="#/${name}" class="index-card">
+        <span class="card-category">${article.category}</span>
+        <span class="card-title">${article.title}</span>
+      </a>
+    `;
+  });
+
+  indexHtml += `
+      </div>
+    </div>
+  `;
+
+  articleContentEl.innerHTML = indexHtml;
+  articleContentEl.classList.add('loaded');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 /**
