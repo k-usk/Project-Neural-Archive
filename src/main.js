@@ -127,12 +127,16 @@ function setupAutoLinks() {
         let processed = markdown;
 
         // Temporarily replace blocks that shouldn't be auto-linked with placeholders
-        // Includes: Markdown links, headers, code blocks, inline code, and math blocks ($...$ or $$...$$)
+        // Includes: Markdown links, headers, code blocks, inline code, and math blocks
         const protectedBlocks = [];
-        processed = processed.replace(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|```[\s\S]*?```|`[^`]*`|\[[^\]]*\]\([^\)]*\)|\#\s+.+)/g, (match) => {
+        processed = processed.replace(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|```[\s\S]*?```|`[^`]*`|\[[^\]]*\]\([^\)]*\)|<a [^>]+>.*?<\/a>|\#\s+.+)/g, (match) => {
           protectedBlocks.push(match);
           return `__PROTECTED_BLOCK_${protectedBlocks.length - 1}__`;
         });
+        
+        // Feature: Solve Marked's CJK parsing bug by converting **bold** to <strong> directly
+        // (Since code blocks and math are already protected above, this is safe)
+        processed = processed.replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>');
         
         // Escape regex special characters in titles
         const escapedTitles = allTitles.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
@@ -147,7 +151,7 @@ function setupAutoLinks() {
           const currentHash = window.location.hash.replace('#/', '') || 'introduction';
           if (name === currentHash) return match;
           
-          return `[${match}](#/${name})`;
+          return `<a href="#/${name}" class="auto-link">${match}</a>`;
         });
 
         // Restore protected blocks
