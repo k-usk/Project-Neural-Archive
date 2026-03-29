@@ -11,6 +11,7 @@ const articleContentEl = document.getElementById('article-content');
 
 // Store discovered articles
 const articles = {};
+const fileNameToSlug = {}; // Map fileName to slug for robust fallback routing
 
 /**
  * Initialize the Wiki: Load content, detect H1 titles, and build sidebar
@@ -43,6 +44,11 @@ async function init() {
       loader,
       content: rawContent
     };
+
+    // Store fileName mapping for robust fallback (e.g. #/transformer -> #/tech/transformer)
+    if (!fileNameToSlug[fileName]) {
+      fileNameToSlug[fileName] = slug;
+    }
   });
 
   await Promise.all(loadPromises);
@@ -206,6 +212,14 @@ async function handleRouting() {
     const href = link.getAttribute('href');
     link.classList.toggle('active', href === `#/${hash === 'introduction' ? '' : hash}`);
   });
+
+  // Robust Resolution: If slug not found, try finding by fileName
+  if (!articles[hash] && fileNameToSlug[hash]) {
+    const slug = fileNameToSlug[hash];
+    console.warn(`Redirecting legacy link: ${hash} -> ${slug}`);
+    window.location.hash = `#/${slug}`;
+    return;
+  }
 
   loadArticle(hash);
 }
