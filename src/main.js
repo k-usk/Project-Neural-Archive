@@ -90,10 +90,19 @@ function setupAutoLinks() {
   marked.use({
     hooks: {
       preprocess(markdown) {
+        // Fix Marked's CJK bold bug: inject non-breaking zero-width spaces (ZWSP) around `**`
+        let processed = markdown;
+        
+        // This regex ensures we only inject a space if there is a character right next to `**`
+        // We use a regular space to trick the markdown parser into seeing a boundary
+        processed = processed.replace(/([^\s\*])\*\*(.*?)\*\*([^\s\*])/g, '$1 **$2** $3');
+        processed = processed.replace(/^\*\*(.*?)\*\*([^\s\*])/gm, '**$1** $2');
+        processed = processed.replace(/([^\s\*])\*\*(.*?)\*\*$/gm, '$1 **$2**');
+
         // 1. Temporarily replace blocks that shouldn't be auto-linked with placeholders
         // Includes: Markdown links, headers, code blocks, inline code, and math blocks ($...$ or $$...$$)
         const protectedBlocks = [];
-        let processed = markdown.replace(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|```[\s\S]*?```|`[^`]*`|\[[^\]]*\]\([^\)]*\)|\#\s+.+)/g, (match) => {
+        processed = processed.replace(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|```[\s\S]*?```|`[^`]*`|\[[^\]]*\]\([^\)]*\)|\#\s+.+)/g, (match) => {
           protectedBlocks.push(match);
           return `__PROTECTED_BLOCK_${protectedBlocks.length - 1}__`;
         });
