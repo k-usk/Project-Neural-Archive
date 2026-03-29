@@ -90,25 +90,32 @@ function setupAutoLinks() {
   marked.use({
     hooks: {
       preprocess(markdown) {
-        let processed = markdown;
+        // 1. Temporarily replace blocks that shouldn't be auto-linked with placeholders
+        // Includes: Markdown links, headers, code blocks, inline code, and math blocks ($...$ or $$...$$)
+        const protectedBlocks = [];
+        let processed = markdown.replace(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$|```[\s\S]*?```|`[^`]*`|\[[^\]]*\]\([^\)]*\)|\#\s+.+)/g, (match) => {
+          protectedBlocks.push(match);
+          return `__PROTECTED_BLOCK_${protectedBlocks.length - 1}__`;
+        });
         
         // Escape regex special characters in titles
         const escapedTitles = allTitles.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
         
-        // Regex to find titles: 
-        // 1. Not inside an existing markdown link [text](link)
-        // 2. Not starting with # (header)
-        // 3. Exact word boundary (using \b, works well for English and common separators)
-        // NOTE: For CJK titles, \b might behave differently, so we check for characters that are not [ or (
-        const regex = new RegExp(`(?<!\\[|\\#\\s)(${escapedTitles.join('|')})(?!\\]\\()`, 'g');
+        // Create regex to match titles as whole phrases
+        const regex = new RegExp(`(${escapedTitles.join('|')})`, 'g');
 
-        return processed.replace(regex, (match) => {
+        processed = processed.replace(regex, (match) => {
           const name = titleToName[match];
           // Check if we are currently viewing this article to avoid self-links
           const currentHash = window.location.hash.replace('#/', '') || 'introduction';
           if (name === currentHash) return match;
           
           return `[${match}](#/${name})`;
+        });
+
+        // 2. Restore protected blocks
+        return processed.replace(/__PROTECTED_BLOCK_(\d+)__/g, (match, index) => {
+          return protectedBlocks[parseInt(index)];
         });
       }
     }
@@ -251,6 +258,11 @@ async function loadArticle(name) {
     
     articleContentEl.innerHTML = html;
     articleContentEl.classList.add('loaded');
+
+    // Trigger MathJax rendering
+    if (window.MathJax && window.MathJax.typesetPromise) {
+      window.MathJax.typesetPromise([articleContentEl]).catch((err) => console.log('MathJax error:', err));
+    }
     
     // Smooth scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
